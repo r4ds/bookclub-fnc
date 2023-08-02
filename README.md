@@ -11,7 +11,7 @@ As we read, we are producing [notes about the book](https://r4ds.io/fnc).
 
 If you would like to present, please see the sign-up sheet for your cohort (linked below, and pinned in the [#book_club-fnc](https://rfordatascience.slack.com/archives/C04LLKVNMP1) channel on Slack)!
 
-- [Cohort 1](https://docs.google.com/spreadsheets/d/1FyD-bQCDYbiIwHoXaldTvrqSc6sRpZeckhvC0mBf1Sg/edit?usp=sharing) (started 2023-08-09, facilitated by Toryn Schafer): [Wednesdays, 5:00 PM CST/CDT](https://www.timeanddate.com/worldclock/converter.html?iso=20230809T220000&p1=24&p2=1440) | [meeting videos](https://www.youtube.com/playlist?list=PL3x6DOfs2NGgf2GCeKJ0i1yzdVcWG6wRc)
+- [Cohort 1](https://docs.google.com/spreadsheets/d/1FyD-bQCDYbiIwHoXaldTvrqSc6sRpZeckhvC0mBf1Sg/edit?usp=sharing) (started 2023-08-16, facilitated by Toryn Schafer): [Wednesdays, 5:00 PM CST/CDT](https://www.timeanddate.com/worldclock/converter.html?iso=20230816T220000&p1=24&p2=1440) | [meeting videos](https://www.youtube.com/playlist?list=PL3x6DOfs2NGgf2GCeKJ0i1yzdVcWG6wRc)
 
 <hr>
 
