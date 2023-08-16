@@ -113,6 +113,7 @@ println("relative accuracy = $(acc/π)")
 $$
 \epsilon_{mach} = 2^{-52} \approx 2.2 \times 10^{-16}
 $$
+
 - roughly gives about 16 decimal digits (not places) 
 - limits range of **exponent** between -1022 and 1023
 - Values greater than $2 \times 10^{308}$ result in *overflow* and an `Inf`
@@ -135,7 +136,7 @@ Relative `julia` functions: `sign()`, `exponent()`, `significand()`, `bitstring(
 
 **Subtractive cancellation**: loss of accuracy when two numbers add/subtract to a result much smaller in magnitude
 
-- orginal number of digits become meaningless
+- original number of digits become meaningless
 - computer/algorithm agnostic
 
 ## Condition numbers, cont. {-}
@@ -162,7 +163,7 @@ $$
 
 - Roots of polynomials are ill-conditioned wrt changes in polynomial coefficients
 - Condition number can be arbitrarily large
-- Cases of repeated rots have infinite condition number
+- Cases of repeated roots have infinite condition number
 
 > `julia` demo: as compared to R, do not need to explicitly use multiplication operation, multiple outputs
 
@@ -230,7 +231,7 @@ plot( x->exp(sin(x)), 0, 6 )
 **unstable algorithm** : an algorithm with error exceeding error expected from conditioning
 
 - quadratic formula is *unstable* in finite precision computation
-- sensitivity of a problem/step is governed by condition number, but sensitivity of algorithm depend son condition numbers of individual steps
+- sensitivity of a problem/step is governed by condition number, but sensitivity of algorithm depends on condition numbers of individual steps
 
 **Backward error**: a measure of the change in original data that reproduces the result of the algorithm
 
