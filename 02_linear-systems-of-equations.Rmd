@@ -4,10 +4,38 @@
 
 - THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
 
-## SLIDE 1 {-}
+## Row pivoting {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+- row swapping can help us avoid division by zero
+- **pivot elements**: diagonal elements of the upper triangular matrix $\mathbf{U}$
+- **row pivoting**: when doing LU-factorization in column $j$, choose the row index (aka pivot element) that corresponds to the largest absolute value to swap rows
+- **Theorem**: row-pivoted LU factorization works iff original matrix is invertible (i.e., is non-singular)
+
+## Permutations and Stability {-}
+
+- **PLU factorization**: LU factorization on a row-pivoted square matrix
+- Solving linear systems requires the same permutation of the vector $\mathbf{b}$
+- Function `lu` in `LinearAlgebra` package 
+- Store the factorization results to solve multiple systems of equations more efficiently
+- choose the largest magnitude element for row pivoting for numerical stability
+
+## Vector norms {-}
+
+- multiple measures of the size of vectors and matrices
+- norms are positive, scalar, and obey the triangle inequality (sum of the norms $\geq$ norm of the sums)
+- vectors with norm 1 are **unit vectors**
+- usually 2-norm is implied
+- Magnitude direction form of a vector $\mathbf{v}$:
+
+$$
+\mathbf{v} = ||\mathbf{v}|| \frac{\mathbf{v}}{||\mathbf{v}||}
+$$
+
+## Matrix norms {-}
+
+- matrix norms are defined via vector norms
+- Frobenius norm is the vector 2-norm extension to matrices
+- induced norm is geometrically interpreted as the radius of the smallest sphere that encloses the projection of unit vectors
 
 ## Meeting Videos {-}
 
