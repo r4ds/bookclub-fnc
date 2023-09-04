@@ -6,6 +6,10 @@
 
 - Learn about QR factorization and apply it to overdetermined systems.
 
+```{julia, echo=FALSE}
+# Verifies package installed, and installs it if it is not
+import Pkg; Pkg.add("FundamentalsNumericalComputation")
+```
 
 ## Fitting Functions to Data
 
