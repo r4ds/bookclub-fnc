@@ -71,7 +71,7 @@ c_n
 = \mathbf{V} \mathbf{c}.
 $$
 
-$\mathbv{V}$ is $m \times n$, taller then it is wider.  We cannot solve this exactly.  But Julia can solve it approximately with the same `\` operator !:
+$\mathbf{V}$ is $m \times n$, taller then it is wider.  We cannot solve this exactly.  But Julia can solve it approximately with the same `\` operator !:
 
 ```{julia}
 V = [ t.^0 t ];
@@ -153,8 +153,8 @@ Kepler found that the orbital period $\tau$ of a planet depends on its mean dist
 ```{julia}
 tau = [87.99, 224.7, 365.26, 686.98, 4332.4, 10759, 30684, 60188];
 R = [57.59, 108.11, 149.57, 227.84, 778.14, 1427, 2870.3, 4499.9];
-scatter(R,tau,title="Orbital Period", label = "data",
-    xlabel=L"R",ylabel=L"tau")
+scatter(R,tau,title="Orbital Period (days)", label = "data",
+    xlabel=L"R (Mkm)",ylabel=L"tau")
 ```
 
 Using the log-log transformation:
@@ -212,7 +212,7 @@ The matrix $\mathbf{A}^T\mathbf{A}$ has some important properties:
 
 ## Implementation {-}
 
-This leads us to a way to solve our linear system, we just use our previous methods to solve the normal equations as a $n\times n$ system.  Since  $\mathbf{A}^T\mathbf{A}$ is symmetric and positive definite, we can use the Cholesky factorization:
+This leads us to a way to solve our linear system, we just use our previous methods to solve the normal equations as a $n\times n$ system.  Since  $\mathbf{A}^T\mathbf{A}$ is symmetric and positive definite, we can use the Cholesky ($\mathbf{N} = \mathbf{R}^T\mathbf{R}$) factorization:
 
 ```{julia}
 function lsnormal(A,b)
@@ -285,7 +285,7 @@ x_LSN = lsnormal(A,b);
 ```
 But it does fail with our own implementation.  
 
-## Exercise 3.2.4
+## Exercise 3.2.4 {-}
 
 Prove that if $\mathbf{A}$ is an invertible square matrix, then $\mathbf{A}^+=\mathbf{A}^{-1}$.
 
