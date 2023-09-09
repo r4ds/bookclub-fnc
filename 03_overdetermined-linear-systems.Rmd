@@ -9,6 +9,7 @@
 ```{julia, echo=FALSE}
 # Verifies package installed, and installs it if it is not
 import Pkg; Pkg.add("FundamentalsNumericalComputation")
+using FundamentalsNumericalComputation;
 ```
 
 ## Fitting Functions to Data
@@ -16,8 +17,6 @@ import Pkg; Pkg.add("FundamentalsNumericalComputation")
 Example: 
 
 ```{julia}
-
-using FundamentalsNumericalComputation;
 year = 1955:5:2000;
 temp = [ -0.0480, -0.0180, -0.0360, -0.0120, -0.0040,
        0.1180, 0.2100, 0.3320, 0.3340, 0.4560 ];
@@ -312,23 +311,147 @@ $$
 
 ## The QR factorization
 
-### Orthoginal and ONC matrices {-}
+### Orthogonal and ONC matrices {-}
 
-### Orthogonal Factorization {-}
+* *orthogonal* : $\mathbf{u}^T\mathbf{v} = 0$ 
 
-### Least squares and QR {-}
+* *orthonormal* : orthogonal +  $\mathbf{u}^T\mathbf{u} = 1$
 
-### Exercise {-}
+* *ONC* : A matrix who's columns are an orthonormal collection. 
+
+
+Properties of $n\times k$ matrix:
+
+* $\mathbf{Q}^T \mathbf{Q}= I$ ($k\times k$ identity)
+
+* $||\mathbf{Q}\mathbf{x}||_2 = ||\mathbf{x}||_2$
+
+* $||\mathbf{Q}||_2 = 1$
+
+* *orthogonal matrix*: A square ONC matrix 
+
+
+Suppose $\mathbf{Q}$ is an $n\times n$ real orthogonal matrix. Then:
+1. $\mathbf{Q}^T = \mathbf{Q}^{-1}$.
+2. $\mathbf{Q}^T$ is also an orthogonal matrix.
+3. $\kappa(\mathbf{Q})=1$ in the 2-norm.
+4. For any other $n\times n$ matrix $\mathbf{A}$, $\| \mathbf{A}\mathbf{Q} \|_2=\| \mathbf{A} \|_2$.
+5. If $\mathbf{U}$ is another $n\times n$ orthogonal matrix, then $\mathbf{Q}\mathbf{U}$ is also orthogonal.
+
+
+## Orthogonal Factorization {-}
+
+
+*Theorem*
+Every real $m\times n$ matrix $\mathbf{A}$ ($m\ge n$) can be written as $\mathbf{A}=\mathbf{Q}\mathbf{R}$, where $\mathbf{Q}$ is an $m\times m$ orthogonal matrix and $\mathbf{R}$ is an $m\times n$ upper triangular matrix.
+
+
+
+* Thin QR:  $\mathbf{A} = \hat{\mathbf{Q}} \hat{\mathbf{R}}$, where $\hat{\mathbf{Q}}$ is $m\times n$ and ONC, and $\hat{\mathbf{R}}$ is $n\times n$ and upper triangular.
+
+```{julia}
+A = rand(1.:9.,6,4);
+Q,R = qr(A);
+Q
+```
+We can also get the thin from Q by converting to matrix:
+
+```{julia}
+Q_hat = Matrix(Q)
+```
+```{julia}
+Q_hat'*Q_hat
+```
+
+## Least squares and QR {-}
+
+We can us this to find the least square solution to  $\mathbf{A}\mathbf{x} = \mathbf{b}$ by substituting the QR factorization of $\mathbf{A}$ into the normal equations:
+
+$$
+\begin{split}
+  \mathbf{A}^T\mathbf{A} \mathbf{x} &= \mathbf{A}^T \mathbf{b}, \\
+  \hat{\mathbf{R}}^T \hat{\mathbf{Q}}^T \hat{\mathbf{Q}} \hat{\mathbf{R}} \mathbf{x} &= \hat{\mathbf{R}}^T \hat{\mathbf{Q}}^T \mathbf{b}, \\
+  \hat{\mathbf{R}}^T \hat{\mathbf{R}} \mathbf{x}& = \hat{\mathbf{R}}^T \hat{\mathbf{Q}}^T \mathbf{b}.
+\end{split}
+$$
+
+As long as $\mathbf{A}$ is not rank deficient, we then have $\hat{\mathbf{R}} \mathbf{x}=\hat{\mathbf{Q}}^T \mathbf{b}$. Since $R$ is upper triangular we can solve this using back subsitution!
+
+```{julia}
+function lsqrfact(A,b)
+    Q,R = qr(A)
+    c = Q'*b
+    x = FNC.backsub(R,c)
+    return x
+end
+```
+
+Does this improve our previous solution to demo in 3.2?
+
+```{julia}
+t = range(0,3,length=400);
+f = [ x->sin(x)^2, x->cos((1+1e-7)*x)^2, x->1. ];
+A = [ f(t) for t in t, f in f ];
+ 
+x = [1.,2,1];
+b = A*x;
+observed_error = norm(lsqrfact(A,b)-x)/norm(x);
+@show observed_error
+κ = cond(A);
+@show error_bound = κ*eps()
+```
+
+
+## Exercise 3.3.7 {-}
 
 ## Computing QR factorizations
 
+QR factorization can be computed with Gram-Schmidt process. This section of the book shows how this is down mechanically using *Householder reflections*. 
+
 ### Householder reflections {-}
 
-### Factorization Algorithm {-}
+* Householder reflector is a matrix of the form: $\mathbf{P} = \mathbf{I} - 2 \mathbf{v}\mathbf{v}^T$ where $v$ is a unit vector. 
+
+* Note that $\mathbf{P}$ is orthogonal and for any vector $\mathbf{x}$: 
+
+$$
+\mathbf{P}\mathbf{x} = \mathbf{x} - 2 \mathbf{v} (\mathbf{v}^T\mathbf{x})
+$$
+
+This is a *reflection* of $\mathbf{x}$ about the hyperplane with normal vector $\mathbf{v}$
+
+
+## Factorization Algorithm {-}
+
+How does this help us do the factorization?  The key observation is that given a vector $\mathbf{z}$ we can choose a $\mathbf{V}$ so that $\mathbf{P}$ reflect $\mathbf{z}$ *onto* the $\mathbf{e}_1$ axis:
+
+$$
+\mathbf{P}\mathbf{z} =
+\begin{bmatrix}
+\pm \| \mathbf{z} \|\\0 \\ \vdots \\ 0
+\end{bmatrix} = \pm \| \mathbf{z} \| \mathbf{e}_1.
+$$
+
+This uses the fact that $\mathbf{P}$ is orthogonal and so preserves the norm.
+
+The vector that will do this is:
+
+$$
+\mathbf{v} = \frac{\mathbf{w}}{||\mathbf{w}||}\text{,  }\mathbf{w} = ||\mathbf{z}||e_1-z
+$$
+
+
+The book describes the process in detail, but the essence of the idea is to use this idea to successively turn the matrix $\mathbf{A}$ into $\mathbf{R}$.  The orthogonal projection matrices form $\mathbf{Q}$
+
+
 
 ### Q-less QR and least squares {-}
 
-### Exercise {-}
+* Since we only need $\mathbf{Q}$  to compute $\mathbf{Q}^T b$, we don't need the full $\mathbf{Q}$
+
+* Leads to "Q-less" factorization: In *julia* a special "QRCompactWYQ" object is returned for efficient calculation of $\mathbf{Q}^T b$ 
+
+## Exercise 3.4.1 {-}
 
 ## Meeting Videos {-}
 
