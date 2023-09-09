@@ -310,6 +310,26 @@ $$
 \end{aligned}
 $$
 
+## The QR factorization
+
+### Orthoginal and ONC matrices {-}
+
+### Orthogonal Factorization {-}
+
+### Least squares and QR {-}
+
+### Exercise {-}
+
+## Computing QR factorizations
+
+### Householder reflections {-}
+
+### Factorization Algorithm {-}
+
+### Q-less QR and least squares {-}
+
+### Exercise {-}
+
 ## Meeting Videos {-}
 
 ### Cohort 1 {-}
