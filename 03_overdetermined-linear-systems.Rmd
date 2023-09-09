@@ -309,7 +309,7 @@ $$
 \end{aligned}
 $$
 
-## The QR factorization
+##  QR factorization
 
 ### Orthogonal and ONC matrices {-}
 
