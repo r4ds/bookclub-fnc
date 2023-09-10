@@ -8,7 +8,7 @@
 
 ```{julia, echo=FALSE}
 # Verifies package installed, and installs it if it is not
-import Pkg; Pkg.add("FundamentalsNumericalComputation")
+#import Pkg; Pkg.add("FundamentalsNumericalComputation")
 using FundamentalsNumericalComputation;
 ```
 
@@ -404,6 +404,37 @@ observed_error = norm(lsqrfact(A,b)-x)/norm(x);
 
 ## Exercise 3.3.7 {-}
 
+Repeat Exercise 3.1.2 but use thin QR factorization rather than backlash operator
+
+```{julia}
+counts = [3.929, 5.308, 7.240, 9.638, 12.87, 17.07, 23.19, 31.44, 39.82, 50.19, 62.95, 76.21, 92.22, 106.0, 122.8, 132.2, 150.7, 179.3, 203.3, 226.5, 248.7, 281.4, 308.7];
+
+years =  collect(1790:10:2010);
+scatter(years, counts,title="US Population)", label = "data",
+    xlabel=L"Year",ylabel=L"millions")
+
+```
+
+```{julia}
+A = [years.^0 years.^1 years.^2 years.^3];
+c = FNC.lsqrfact(A, counts)
+  
+```
+```{julia}
+p = Polynomial(c);
+plot!(p,1790,2010,label="interpolant")
+
+```
+
+Predicted population in 2020:
+
+```{julia}
+p(2020)
+```
+Actual: 331.4
+
+
+
 ## Computing QR factorizations
 
 QR factorization can be computed with Gram-Schmidt process. This section of the book shows how this is down mechanically using *Householder reflections*. 
@@ -452,6 +483,41 @@ The book describes the process in detail, but the essence of the idea is to use 
 * Leads to "Q-less" factorization: In *julia* a special "QRCompactWYQ" object is returned for efficient calculation of $\mathbf{Q}^T b$ 
 
 ## Exercise 3.4.1 {-}
+
+Find a Householder reflector $\mathbf{P}$ such that
+  
+$$
+    \mathbf{P}
+    \begin{bmatrix}
+      2 \\ 9 \\ -6
+    \end{bmatrix} =
+    \begin{bmatrix}
+      11\\0\\0
+    \end{bmatrix}.
+$$
+
+
+```{julia}
+
+z = [2,9,-6]; 
+
+FNC.norm(z)
+```
+
+This is of the form that we can apply Theorem 3.4.2
+
+```{julia}
+e1 = [1,0,0];
+
+w = FNC.norm(z)*e1 - z;
+v = w/FNC.norm(w);
+
+P =  I - 2*v*v';
+
+# verify
+P*z
+
+```
 
 ## Meeting Videos {-}
 
