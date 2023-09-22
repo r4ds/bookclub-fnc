@@ -2,12 +2,577 @@
 
 **Learning objectives:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- Learn to "solve" overdetermined linear systems: $\mathbf{A}\mathbf{X} = \mathbf{b}$ where  $\mathbf{A}$ is $m \times n$ and $m > n$. 
 
-## SLIDE 1 {-}
+- Learn about QR factorization and apply it to overdetermined systems.
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+
+
+```{julia, echo=FALSE, eval=FALSE}
+# Verifies package installed, and installs it if it is not
+#import Pkg; Pkg.add("FundamentalsNumericalComputation")
+using FundamentalsNumericalComputation;
+```
+
+## Fitting Functions to Data
+
+Example: 
+
+```{julia, eval=FALSE}
+year = 1955:5:2000;
+temp = [ -0.0480, -0.0180, -0.0360, -0.0120, -0.0040,
+       0.1180, 0.2100, 0.3320, 0.3340, 0.4560 ];
+    
+scatter(year,temp,label="data",
+    xlabel="year",ylabel="anomaly (degrees C)",leg=:bottomright)
+```
+
+![figure1](figure/chapter3fig1.png)
+
+- A polynomial interpolant would overfit the data:
+
+```{julia, eval=FALSE}
+t = @. (year-1950)/10;
+n = length(t);
+V = [ t[i]^j for i in 1:n, j in 0:n-1 ];
+c = V\temp;
+
+p = Polynomial(c);
+f = yr -> p((yr-1950)/10);
+plot!(f,1955,2000,label="interpolant")
+```
+
+![figure2](figure/chapter3fig2.png)
+- Instead approximate with lower degree polynomial:
+
+$$
+y \approx f(t) = c_1 + c_2t + \cdots + c_{n-1} t^{n-2} + c_n t^{n-1},
+$$
+Or as matrix multiplication:
+
+$$
+\begin{bmatrix} y_1 \\ y_2 \\ y_3 \\ \vdots \\ y_m \end{bmatrix} \approx
+\begin{bmatrix}
+f(t_1)                               \\
+f(t_2)                               \\
+f(t_3)                               \\
+\vdots                               \\
+f(t_m)
+\end{bmatrix} =
+\begin{bmatrix}
+1      & t_1    & \cdots & t_1^{n-1} \\
+1      & t_2    & \cdots & t_2^{n-1} \\
+1      & t_3    & \cdots & t_3^{n-1} \\
+\vdots & \vdots &        & \vdots    \\
+1      & t_m    & \cdots & t_m^{n-1} \\
+\end{bmatrix}
+\begin{bmatrix}
+c_1                                  \\
+c_2                                  \\
+\vdots                               \\
+c_n
+\end{bmatrix}
+= \mathbf{V} \mathbf{c}.
+$$
+
+$\mathbf{V}$ is $m \times n$, taller then it is wider.  We cannot solve this exactly.  But Julia can solve it approximately with the same `\` operator !:
+
+```{julia, eval=FALSE}
+V = [ t.^0 t ];
+@show size(V);
+c = V\temp;
+p = Polynomial(c);
+
+f = yr -> p((yr-1955)/10);
+scatter(year,temp,label="data",
+    xlabel="year",ylabel="anomaly (degrees C)",leg=:bottomright);
+plot!(f,1955,2000,label="linear fit")
+
+```
+
+![figure 3](figure/chapter3fig3.png)
+
+
+## Least Squares {-}
+
+- More generally, linear least-squares problems have the form:
+
+$$
+f(t) = c_1 f_1(t) + \cdots + c_n f_n(t)
+$$
+
+Where the function $f_i$ are all known functions.
+
+- The fit will only be approximate, with *residuals* $y_i - f(t_i)$. 
+
+- The *least squares* approach minimizes:
+
+$$
+R(c_1,\ldots,c_n) = \sum_{i=1}^m\, [ y_i - f(t_i) ]^2
+$$
+- This can be made into a matrix problem: 
+
+$$
+\begin{aligned}
+\mathbf{r} &=
+\begin{bmatrix}
+y_1 \\ y_2 \\ \vdots \\y_{m-1} \\ y_m
+\end{bmatrix} -
+\begin{bmatrix}
+f_1(t_1) & f_2(t_1) & \cdots & f_n(t_1) \\[1mm]
+f_1(t_2) & f_2(t_2) & \cdots & f_n(t_2) \\[1mm]
+& \vdots \\
+f_1(t_{m-1}) & f_2(t_{m-1}) & \cdots & f_n(t_{m-1}) \\[1mm]
+f_1(t_m) & f_2(t_m) & \cdots & f_n(t_m) \\[1mm]
+\end{bmatrix}
+\begin{bmatrix}
+c_1 \\ c_2 \\ \vdots \\ c_n
+\end{bmatrix}\\
+&= \mathbf{b}- \mathbf{A}\mathbf{x}
+\end{aligned}
+$$
+
+- The linear least squares problem is then to minimize $R = \mathbf{r}^T\mathbf{r}$ or more generally:
+
+### Defintion {-} 3.1.3:
+
+Given $\mathbf{A} \in \mathscr{R}^{m \times n}$ and $\mathbf{b} \in \mathscr{R}^m$, with $m > n$, find:
+
+$$
+\underset{\mathbf{x} \in \mathscr{R}^n }{\text{argmin}}\, \bigl\| \mathbf{b}-\mathbf{A} \mathbf{x} \bigr\|_2^2
+$$
+
+## Change of Variables {-}
+
+- Sometimes non-linear fit functions (e.g. $g(t) = a_1 e^{a_2 t}$ ) can be transformed into a linear fit with a change of variables:
+
+$$\log g(t) = \log a_1 + a_2 t = c_1 + c_2 t$$ 
+- Another example, the power law $y\approx f(t)=a_1 t^{a_2}$ can be transformed with a log-log transformation into a linear form:
+
+$$
+\log y \approx (\log a_1) + a_2 (\log t)
+$$
+
+## Exercise 3.1.7 {-}
+
+Kepler found that the orbital period $\tau$ of a planet depends on its mean distance $R$ from the sun according to $\tau=c R^{\alpha}$ for a simple rational number $\alpha$. Perform a linear least-squares fit from the following table in order to determine the most likely simple rational value of $\alpha$.
+
+```{julia, eval=FALSE}
+tau = [87.99, 224.7, 365.26, 686.98, 4332.4, 10759, 30684, 60188];
+R = [57.59, 108.11, 149.57, 227.84, 778.14, 1427, 2870.3, 4499.9];
+scatter(R,tau,title="Orbital Period (days)", label = "data",
+    xlabel=L"R (Mkm)",ylabel=L"tau")
+```
+
+![figure 4](figure/chapter3fig4.png)
+
+Using the log-log transformation:
+
+$$
+\log \tau = \log c + \alpha \log R 
+$$
+
+```{julia, eval=FALSE}
+V = [R.^0 log.(R)];
+c = V \ log.(tau);
+@show c[2]
+
+# c[2] = 1.4986486620150812
+```
+
+So the  exponent is close to 3/2, which matches Keplar's third law (usually expressed as $\tau^2 \propto R^3$)
+ 
+
+## The Normal Equations
+
+- Now we want to peal back the curtain and see how to solve the least squares problem. 
+
+- One solution depends on this Theorem: If $\mathbf{x}$ satisfies $\mathbf{A}^T(\mathbf{A}\mathbf{x}-\mathbf{b})=\boldsymbol{0}$, then $\mathbf{x}$ solves the linear least-squares problem, i.e., $\mathbf{x}$ minimizes $\| \mathbf{b}-\mathbf{A}\mathbf{x} \|_2$. (Proof in text)
+
+- Expanding out  $\mathbf{A}^T(\mathbf{A}\mathbf{x}-\mathbf{b})=\boldsymbol{0}$ yields the *normal equations*:
+
+$$
+\mathbf{A}^T\mathbf{A}\mathbf{x}=\mathbf{A}^T\mathbf{b}
+$$
+
+ 
+
+## Pseudoinverse and definiteness {-}
+
+The normal equations are a square  $n\times n$ linear system to solve for $\mathbf{x}$ which leads to the defintion of the *pseudoinverse* as a formal solution:
+
+$$
+\mathbf{A}^+ = (\mathbf{A}^T\mathbf{A})^{-1}\mathbf{A}^T
+$$
+
+In practice this is not used for the same reason that the ordinary inverse is not used. But conceptually the `\` operator is mathematically equivalent to left multiplying by the inverse (square matrix) or pseudoinverse (rectangular).
+
+The matrix $\mathbf{A}^T\mathbf{A}$ has some important properties:
+
+1. $\mathbf{A}^T\mathbf{A}$ is symmetric
+
+2. $\mathbf{A}^T\mathbf{A}$ is singular only if the columns of $\mathbf{A}$  or linearly dependant.
+
+3. If $\mathbf{A}^T\mathbf{A}$ is nonsingular, that it is positive definate.
+
+## Implementation {-}
+
+This leads us to a way to solve our linear system, we just use our previous methods to solve the normal equations as a $n\times n$ system.  Since  $\mathbf{A}^T\mathbf{A}$ is symmetric and positive definite, we can use the Cholesky ($\mathbf{N} = \mathbf{R}^T\mathbf{R}$) factorization:
+
+```{julia, eval=FALSE}
+function lsnormal(A,b)
+    N = A'*A;  z = A'*b;
+    R = cholesky(N).U
+    w = FNC.forwardsub(R',z)                   # solve R'z=c
+    x = FNC.backsub(R,w)                       # solve Rx=z
+    return x
+end
+```
+
+This takes $\sim (mn^2 + \frac{1}{3}n^3)$ flops
+
+## Conditioning and Stability {-}
+
+- The algorithm used by Julia's `\` does *not* use the normal equations because of instability.  
+
+- We need the condition number of a rectangular matrix, which is defined to be:
+
+$$
+\kappa(\mathbf{A}) = \|\mathbf{A}\|_2 \cdot \|\mathbf{A}^{+}\|_2.
+$$
+
+- When the residuals are small, the conditioning of the least squares problem is close to $\kappa(\mathbf{A})$. 
+
+- However, our algorithm uses $\mathbf{A}^T\mathbf{A}$ , so the condition number is amplified to $\kappa(\mathbf{A}^2)$, which can destabilize the normal equations (increasing the sensitivity to small changes).
+
+- Demo:
+
+```{julia, eval=FALSE}
+t = range(0,3,length=400);
+f = [ x->sin(x)^2, x->cos((1+1e-7)*x)^2, x->1. ];
+A = [ f(t) for t in t, f in f ];
+κ = cond(A)
+# 1.825322542326142e7
+```
+
+Set up fake problem with known exact solution (zero residual)
+
+```{julia, eval=FALSE}
+x = [1.,2,1];
+b = A*x;
+```
+
+Use backslash:
+
+```{julia, eval = FALSE}
+x_BS = A\b;
+observed_error = norm(x_BS-x)/norm(x);
+error_bound = κ*eps();
+@show observed_error
+@show error_bound
+# observed_error = 2.279154063514702e-11
+# error_bound = 4.053030227715619e-9
+```
+
+Now try it using normal equations:
+
+```{julia, eval=FALSE}
+N = A'*A;
+x_NE = N\(A'*b);
+@show observed_err = norm(x_NE-x)/norm(x)
+@show digits = -log10(observed_err)
+    
+#observed_err = norm(x_NE - x) / norm(x) = 2.719479911021037e-16
+#digits = -(log10(observed_err)) = 15.565514144999181
+```
+
+*THAT IS ODD* . In the book this was much less accurate. I suspect some changes to how the backslach operator works, but did not investigate further.
+
+
+```{julia, eval=FALSE}
+x_LSN = lsnormal(A,b);
+
+@show observed_err = norm(x_LSN-x)/norm(x)
+@show digits = -log10(observed_err)
+
+# observed_err = norm(x_LSN - x) / norm(x) = 0.015371886019245154
+# digits = -(log10(observed_err)) = 1.8132728444390442
+```
+
+If we use our own implementation of solving the normal equation using backsub/forward sub we do see a small number of digits of accuracy, so the julia backslash operator is doing something different here (now). 
+
+## Exercise 3.2.4 {-}
+
+Prove that if $\mathbf{A}$ is an invertible square matrix, then $\mathbf{A}^+=\mathbf{A}^{-1}$.
+
+First we note that if $\mathbf{A}$ is invertable then so is its transpose:
+
+$$
+\begin{aligned}
+\mathbf{A} \mathbf{A}^{-1} &= I\\
+(\mathbf{A} \mathbf{A}^{-1})^T &= I\\
+(\mathbf{A}^{-1})^T \mathbf{A}^T &= I
+\end{aligned}
+$$
+
+So the inverse of $\mathbf{A}^T$ is $(\mathbf{A}^T)^{-1} = (\mathbf{A}^{-1})^T$  (Sometimes written as $\mathbf{A}^{-T}$)
+So with that we can use the fact that the inverse of a product of two matrices is the product of the inverses in reverse order to find:
+
+$$
+\begin{aligned}
+\mathbf{A}^+ &= (\mathbf{A}^T\mathbf{A})^{-1}\mathbf{A}^T \\
+&=\mathbf{A}^{-1}(\mathbf{A^T})^{-1}A^T\\
+&= \mathbf{A}^{-1}
+\end{aligned}
+$$
+
+##  QR factorization
+
+### Orthogonal and ONC matrices {-}
+
+* *orthogonal* : $\mathbf{u}^T\mathbf{v} = 0$ 
+
+* *orthonormal* : orthogonal +  $\mathbf{u}^T\mathbf{u} = 1$
+
+* *ONC* : A matrix who's columns are an orthonormal collection. 
+
+
+Properties of $n\times k$ matrix:
+
+* $\mathbf{Q}^T \mathbf{Q}= I$ ($k\times k$ identity)
+
+* $||\mathbf{Q}\mathbf{x}||_2 = ||\mathbf{x}||_2$
+
+* $||\mathbf{Q}||_2 = 1$
+
+* *orthogonal matrix*: A square ONC matrix 
+
+
+Suppose $\mathbf{Q}$ is an $n\times n$ real orthogonal matrix. Then:
+1. $\mathbf{Q}^T = \mathbf{Q}^{-1}$.
+2. $\mathbf{Q}^T$ is also an orthogonal matrix.
+3. $\kappa(\mathbf{Q})=1$ in the 2-norm.
+4. For any other $n\times n$ matrix $\mathbf{A}$, $\| \mathbf{A}\mathbf{Q} \|_2=\| \mathbf{A} \|_2$.
+5. If $\mathbf{U}$ is another $n\times n$ orthogonal matrix, then $\mathbf{Q}\mathbf{U}$ is also orthogonal.
+
+
+## Orthogonal Factorization {-}
+
+
+*Theorem*
+Every real $m\times n$ matrix $\mathbf{A}$ ($m\ge n$) can be written as $\mathbf{A}=\mathbf{Q}\mathbf{R}$, where $\mathbf{Q}$ is an $m\times m$ orthogonal matrix and $\mathbf{R}$ is an $m\times n$ upper triangular matrix.
+
+
+
+* Thin QR:  $\mathbf{A} = \hat{\mathbf{Q}} \hat{\mathbf{R}}$, where $\hat{\mathbf{Q}}$ is $m\times n$ and ONC, and $\hat{\mathbf{R}}$ is $n\times n$ and upper triangular.
+
+```{julia, eval=FALSE}
+A = rand(1.:9.,6,4);
+Q,R = qr(A);
+```
+
+We can  get the thin from Q by converting to matrix:
+
+```{julia, eval = FALSE}
+Q_hat = Matrix(Q)
+
+#6×4 Matrix{Float64}:
+# -0.35793   -0.14544    -0.152543   0.829375
+# -0.178965  -0.71283    -0.130244  -0.0381754
+# -0.417585   0.207821   -0.702897  -0.0976324
+# -0.298275  -0.498701    0.397811  -0.146905
+# -0.536895   0.0280366  -0.078145  -0.512537
+# -0.536895   0.421951    0.548947   0.129896
+
+```
+
+Verify that $Q^T Q$ is the identity:
+
+```{julia, eval=FALSE}
+Q_hat'*Q_hat
+
+#4×4 Matrix{Float64}:
+#  1.0          -2.21581e-17  -2.82658e-17   4.37205e-17
+# -2.21581e-17   1.0          -5.41623e-17   8.02735e-17
+# -2.82658e-17  -5.41623e-17   1.0          -9.94081e-17
+#  4.37205e-17   8.02735e-17  -9.94081e-17   1.0
+```
+
+## Least squares and QR {-}
+
+We can us this to find the least square solution to  $\mathbf{A}\mathbf{x} = \mathbf{b}$ by substituting the QR factorization of $\mathbf{A}$ into the normal equations:
+
+$$
+\begin{split}
+  \mathbf{A}^T\mathbf{A} \mathbf{x} &= \mathbf{A}^T \mathbf{b}, \\
+  \hat{\mathbf{R}}^T \hat{\mathbf{Q}}^T \hat{\mathbf{Q}} \hat{\mathbf{R}} \mathbf{x} &= \hat{\mathbf{R}}^T \hat{\mathbf{Q}}^T \mathbf{b}, \\
+  \hat{\mathbf{R}}^T \hat{\mathbf{R}} \mathbf{x}& = \hat{\mathbf{R}}^T \hat{\mathbf{Q}}^T \mathbf{b}.
+\end{split}
+$$
+
+As long as $\mathbf{A}$ is not rank deficient, we then have $\hat{\mathbf{R}} \mathbf{x}=\hat{\mathbf{Q}}^T \mathbf{b}$. Since $R$ is upper triangular we can solve this using back subsitution!
+
+```{julia, eval=FALSE}
+function lsqrfact(A,b)
+    Q,R = qr(A)
+    c = Q'*b
+    x = FNC.backsub(R,c)
+    return x
+end
+```
+
+Does this improve our previous solution to demo in 3.2?
+
+```{julia, eval=FALSE}
+t = range(0,3,length=400);
+f = [ x->sin(x)^2, x->cos((1+1e-7)*x)^2, x->1. ];
+A = [ f(t) for t in t, f in f ];
+ 
+x = [1.,2,1];
+b = A*x;
+observed_error = norm(lsqrfact(A,b)-x)/norm(x);
+@show observed_error
+κ = cond(A);
+@show error_bound = κ*eps()
+
+# observed_error = 2.1513528812733333e-9
+# error_bound = κ * eps() = 4.053030227715619e-9
+
+```
+
+
+
+## Exercise 3.3.7 {-}
+
+Repeat Exercise 3.1.2 but use thin QR factorization rather than backlash operator
+
+```{julia, eval=FALSE}
+counts = [3.929, 5.308, 7.240, 9.638, 12.87, 17.07, 23.19, 31.44, 39.82, 50.19, 62.95, 76.21, 92.22, 106.0, 122.8, 132.2, 150.7, 179.3, 203.3, 226.5, 248.7, 281.4, 308.7];
+
+years =  collect(1790:10:2010);
+scatter(years, counts,title="US Population)", label = "data",
+    xlabel=L"Year",ylabel=L"millions")
+
+```
+
+Use lsqrfact:
+
+```{julia, eval=FALSE}
+A = [years.^0 years.^1 years.^2 years.^3];
+c = FNC.lsqrfact(A, counts)
+
+#4-element Vector{Float64}:
+# -20617.55777543976
+#     42.913662533882025
+#     -0.02866659442717994
+#      6.216970710425838e-6  
+```
+
+```{julia, eval=FALSE}
+p = Polynomial(c);
+plot!(p,1790,2010,label="interpolant")
+```
+
+![figure 4](figure/chapter3fig5.png)
+Predicted population in 2020:
+
+```{julia, eval=FALSE}
+p(2020)
+# 339.7
+```
+Actual: 331.4
+
+
+
+## Computing QR factorizations
+
+QR factorization can be computed with Gram-Schmidt process. This section of the book shows how this is down mechanically using *Householder reflections*. 
+
+### Householder reflections {-}
+
+* Householder reflector is a matrix of the form: $\mathbf{P} = \mathbf{I} - 2 \mathbf{v}\mathbf{v}^T$ where $v$ is a unit vector. 
+
+* Note that $\mathbf{P}$ is orthogonal and for any vector $\mathbf{x}$: 
+
+$$
+\mathbf{P}\mathbf{x} = \mathbf{x} - 2 \mathbf{v} (\mathbf{v}^T\mathbf{x})
+$$
+
+This is a *reflection* of $\mathbf{x}$ about the hyperplane with normal vector $\mathbf{v}$
+
+
+## Factorization Algorithm {-}
+
+How does this help us do the factorization?  The key observation is that given a vector $\mathbf{z}$ we can choose a $\mathbf{V}$ so that $\mathbf{P}$ reflect $\mathbf{z}$ *onto* the $\mathbf{e}_1$ axis:
+
+$$
+\mathbf{P}\mathbf{z} =
+\begin{bmatrix}
+\pm \| \mathbf{z} \|\\0 \\ \vdots \\ 0
+\end{bmatrix} = \pm \| \mathbf{z} \| \mathbf{e}_1.
+$$
+
+This uses the fact that $\mathbf{P}$ is orthogonal and so preserves the norm.
+
+The vector that will do this is:
+
+$$
+\mathbf{v} = \frac{\mathbf{w}}{||\mathbf{w}||}\text{,  }\mathbf{w} = ||\mathbf{z}||e_1-z
+$$
+
+
+The book describes the process in detail, but the essence of the idea is to use this idea to successively turn the matrix $\mathbf{A}$ into $\mathbf{R}$.  The orthogonal projection matrices form $\mathbf{Q}$
+
+
+
+### Q-less QR and least squares {-}
+
+* Since we only need $\mathbf{Q}$  to compute $\mathbf{Q}^T b$, we don't need the full $\mathbf{Q}$
+
+* Leads to "Q-less" factorization: In *julia* a special "QRCompactWYQ" object is returned for efficient calculation of $\mathbf{Q}^T b$ 
+
+## Exercise 3.4.1 {-}
+
+Find a Householder reflector $\mathbf{P}$ such that
+  
+$$
+    \mathbf{P}
+    \begin{bmatrix}
+      2 \\ 9 \\ -6
+    \end{bmatrix} =
+    \begin{bmatrix}
+      11\\0\\0
+    \end{bmatrix}.
+$$
+
+
+```{julia, eval=FALSE}
+
+z = [2,9,-6]; 
+
+FNC.norm(z)
+# 11.0
+```
+
+This is of the form that we can apply Theorem 3.4.2.
+
+```{julia, eval=FALSE}
+e1 = [1,0,0];
+
+w = FNC.norm(z)*e1 - z;
+v = w/FNC.norm(w);
+
+P =  I - 2*v*v';
+
+# verify
+P*z
+
+#3-element Vector{Float64}:
+# 11.0
+# -8.881784197001252e-16
+#  8.881784197001252e-16
+
+```
 
 ## Meeting Videos {-}
 
@@ -22,3 +587,5 @@
 LOG
 ```
 </details>
+
+
