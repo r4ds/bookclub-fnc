@@ -1,13 +1,191 @@
+```{r setup_ch4, echo = FALSE, warning = FALSE, message = FALSE}
+knitr::opts_chunk$set(
+  eval = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+
+library(JuliaCall)
+JuliaCall::julia_setup(JULIA_HOME = "/Applications/Julia-1.9.app/Contents/Resources/julia/bin")
+```
+
+
 # Roots of nonlinear equations
 
 **Learning objectives:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- A discussion of algorithms for rootfinding problem, fixed point iteration, and non-linear systems
 
-## SLIDE 1 {-}
+## The rootfinding problem {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+- Cannot be solved in finite number of operations
+- Condition number of a root is magnitude of derivative of the inverse
+    + When $|f'|$ is small at the root (flatter), harder to find root
+- The backward error in root estimate is equal to the residual
+- **Multiplicity**: $f(r) = 0 = f'(r) = \cdots = f^{(m-1)}(r) = 0$, but $f^{(m)}(r) \neq 0$
+- **Simple root**: if $f(r) = 0$ and $f'(r) = 0$
+
+## The rootfinding problem, Exercise 1 {-}
+
+1. $x^2 = e^{-x}$, over [-2, 2]
+
+a. Rewrite: $f(x) = e^{-x} - x^2$ 
+
+
+```{julia}
+using FundamentalsNumericalComputation
+
+f1(x) = exp(-x) - x^(2.);
+x1 = -2:0.1:2;
+
+plot(x1, f1.(x1))
+#plot(f1, -2, 2)
+```
+
+There should be one root.
+
+b. 
+```{julia}
+s1 = nlsolve(x->f1(x[1]), [0.75], ftol = 1e-14);
+[s1.zero f1.(s1.zero)]
+```
+
+c. inverse of the derivative evaluated at the root
+
+```{julia}
+f1d(x) = -exp(-x) - 2x;
+abs.(f1d.(s1.zero))
+1 ./ abs.(f1d.(s1.zero))
+```
+
+
+## Fixed-point iteration {-}
+
+- Find a **fixed point** $p$ such that $g(p) = p$
+- Observation 4.2.4: convergence if initial error is sufficiently small and $|g'(p)| < 1$, otherwise diverges
+- Lipschitz condition
+
+## Fixed-point iteration, Exercise 2 {-}
+
+$$
+g(x) = 1 + x - \frac 19 x^2, p = 3
+$$
+```{julia}
+g2(x) = 1 + x - (1/9)*x^2;
+
+x2 = [0.0];
+
+for k = 1:25
+  push!(x2,g2(x2[k]))
+end
+
+err = @. abs(x2 - 3);
+
+plot(0:25, err, m =:o,
+     yaxis = ("error", :log10))
+
+y2 = log.(err[18:25]);
+p = Polynomials.fit(18:25, y2, 1);
+sigma = exp(p.coeffs[2])
+```
+
+
+## Newton's method {-}
+
+Given a function $f$, its derivative, $f'$, and an initial value $x_1$, iteratively:
+
+$$ 
+x_{k+1} = x_{k} - \frac{f(x_k)}{f'(x_k)},\quad k = 1,2,...
+$$
+
+- asymptotically, each iteration roughly squares the error
+
+## Newton's method, Exercise 4 {-}
+
+```{julia}
+f4(x) = x^(-2) - sin(x);
+df4dx = x -> -2*x^(-3) - cos(x);
+
+plot(f4, 0.5, 10)
+
+inits = 1.:7.
+x = zeros(length(inits))
+
+for (i,y) in enumerate(inits)
+    f = x -> f4(x) - y
+    dfdx = x -> df4dx(x)
+    r = FNC.newton(f,dfdx,y)
+    x[i] = r[end]
+end
+
+pretty_table([inits x])
+```
+
+
+## Interpolation-based methods {-}
+
+- When a step produces an approximate result, you are free to carry it out approximately
+
+**Secant iteration**:
+
+$$
+x_{k+1} = x_k -  \frac{f(x_k)(x_k - x_{k-1})}{f'(x_k) - f(x_{k+1})},\quad k = 2,3,...
+$$
+
+- converges at a rate strictly between linear and quadratic
+- if function evaluations are used to measure work, secant iteration converges more rapidly than Newton's method
+
+## Newton for nonlinear systems {-}
+
+- more complicated with multiple variables and equations
+- hard problem to tackle in the general case
+- based on Taylor series: linear part of function near x plus higher order term
+
+$$
+\mathbf{f}(\mathbf{x} + \mathbf{h}) = \mathbf{f}(\mathbf{x}) + \mathbf{J}(x)\mathbf{h}+O(||\mathbf{h}||^2)
+$$
+
+**Multidimensional Newton's method**:
+
+Given $\mathbf{f}$ and a starting value $\mathbf{x}_1$, for each $k = 1, 2, 3, ...$:
+
+1. Compute $\mathbf{y}_k = \mathbf{f}(\mathbf{x}_k)$ and $\mathbf{A}_k = \mathbf{f}'(\mathbf{x}_k)$
+2. Solve linear system $\mathbf{A}_k\mathbf{s}_k = -\mathbf{y}_k$ for the **Newton step** $\mathbf{s}_k$
+3. Let $\mathbf{x}_{k+1} = \mathbf{x}_k + \mathbf{s}_k$
+
+## Quasi-Newton methods {-}
+
+- Cons of Newton's method: evaluating Jacobian, tendency of divergence from many starting points
+
+Tackling computation of Jacobian:
+
+- **Finite difference approach**: multidimensional secant iteration; Jacobian is replaced by a quotient replacing one element at a time
+
+$$
+\mathbf{J}(x)\mathbf{e}_j \approx \frac{\mathbf{f}(\mathbf{x} + \delta \mathbf{e}_j) -  \mathbf{f}(\mathbf{x})}{\delta}, \quad j = 1, ..., n.
+$$
+
+- **Broyden's update**: approximate the Jacobian with quantities computed on last iteration and no additional function evaluations
+
+Tackling divergence:
+
+- **Levenberg's method**: 
+    - akin to ridge regression
+    - tempering the squared Jacobian by a small constant 
+    - smooth transition between Newton's method and gradient descent
+    - Levenberg-Marquardt extension has superior strategy for changes in $\lambda$\
+
+## Nonlinear least squares {-}
+
+**Gauss-Newton method**: 
+
+Given $\mathbf{f}$ and a starting value $\mathbf{x}_1$, for each $k = 1, 2, 3, ...$:
+
+1. Compute $\mathbf{y}_k = \mathbf{f}(\mathbf{x}_k)$ and $\mathbf{A}_k$ at $\mathbf{x}_k$
+2. Solve linear least squares $||\mathbf{A}_k\mathbf{s}_k + \mathbf{y}_k ||_2$ for $\mathbf{s}_k$
+3. Let $\mathbf{x}_{k+1} = \mathbf{x}_k + \mathbf{s}_k$
+
+
 
 ## Meeting Videos {-}
 
