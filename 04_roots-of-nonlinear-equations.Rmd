@@ -4,7 +4,9 @@ knitr::opts_chunk$set(
   message = FALSE,
   warning = FALSE
 )
+```
 
+```{r, echo = FALSE}
 library(JuliaCall)
 JuliaCall::julia_setup(JULIA_HOME = "/Applications/Julia-1.9.app/Contents/Resources/julia/bin")
 ```
