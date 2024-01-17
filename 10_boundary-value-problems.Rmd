@@ -1,13 +1,705 @@
+```{r setup_ch10, echo = FALSE, warning = FALSE, message = FALSE}
+knitr::opts_chunk$set(
+  eval = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  out.width = "1000px"
+)
+```
+
+```{r, echo = FALSE}
+library(JuliaCall)
+JuliaCall::julia_setup(JULIA_HOME = "/Applications/Julia-1.9.app/Contents/Resources/julia/bin")
+```
+
+```{julia}
+using FundamentalsNumericalComputation
+default(legend = false)
+```
+
+
 # Boundary-value problems
 
 **Learning objectives:**
 
 - THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
 
-## SLIDE 1 {-}
+## New Julia {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+- in-place style of functions modifying inputs (no return)
+- `eachrow()`: "Create a RowSlices object that is a vector of rows of matrix or vector A"
+- `diff*()`: functions for difference matrices
+- `collect()`: turns a generator (like range) into an array
+
+## Two-point BVP {-}
+
+**Boundary-value problem**: state not entirely given at any point, but partial information is given at multiple values of independent variable.  
+
+**Two-point boundary-value problem**: 
+
+- independent variable bounded (or implied)
+- a function of dependent and derivative at boundary points are zero called **boundary conditions**
+
+- In an IVP, initial value determines future course of the solution (temporal)
+- In a BVP, information is spread across the domain (spatial)
+- Classes of boundary conditions with specific **nomenclature**: Dirichlet, Neumann, Robin
+
+
+## Demo 10.1.5 {-}
+
+Recast the TPBVP as an IVP by specifying a two-dimensional state as the original state and the first derivative (detailed in next section)
+
+```{julia}
+function ode!(f, y, lambda, r)
+  f[1] = y[2]
+  f[2] = lambda/y[1]^2 - y[2]/r
+end;
+
+function bc!(g, y, lambda, r)
+  g[1] = y(0)[2]
+  g[2] = y(1)[1] - 1
+end;
+
+domain = (eps(), 1.0);
+est = [1, 0];
+
+bvp = BVProblem(ode!, bc!, est, domain, 0.6);
+y = solve(bvp);
+
+plot(y, label = [L"w", L"w'"], legend=:right,
+     xlabel = L"r", ylabel = "solution",
+     title = "Solution of MEMS problems for lambda = 0.6")
+```
+
+## Shooting Demo 10.2.1 {-}
+
+**Shooting method**: adjust the guess of the initial value by using information about the "shot"
+
+```{julia}
+lambda = 0.6;
+phi = (r,w,dwdr) -> lambda/w^2 - dwdr/r;
+
+f = (y,p,r) -> [ y[2]; phi(r, y[1], y[2])];
+a,b = eps(),1.0;
+
+plt = plot(xaxis = L"x", yaxis = L"w(x)",
+           title = "Different initial values", leg=:bottomright);
+
+for w0 in 0.4:0.1:0.9
+    IVP = ODEProblem(f, [w0,0], (a,b))
+    y = solve(IVP, Tsit5())
+    plot!(y, vars = [1], label="w(0) = $w0")
+end
+
+plt
+```
+
+## Instability of Shooting Method {-}
+
+Using shooting, accuracy is not symmetric at boundary points
+
+Demo not replicable on my machine
+```{julia}
+plt = plot(xaxis = L"x", yaxis = ([-1.2, 0.5], L"u(x)"),
+           title = "Shooting instability", leg=:topleft);
+
+for lambda in 6:4:18
+  g1(u,du) = u+1
+  g2(u,du) = u
+  phi = (x, u, du_dx) -> lambda^2*(u + 1) #lambda^2 (u+1)
+  x,u = FNC.shoot(phi, (0.0, 1.0), g1, g2, [-1, 0])
+  plot!(x, u, label = "lambda = $lambda")
+end
+
+plt
+```
+
+
+## Differentiaion Matrices {-}
+
+Before, finite differencing for derivative estimation at a point.   
+Now, finite differencing matrices for derivative estimation at a vector of points.
+
+Differentiation matrices have coefficients for one of the previously seen schemes, i.e., forward, backward, centered, first-order, second-order.  
+
+Special consideration for the first and last nodes.
+
+## Demo 10.3.2 {-}
+
+```{julia}
+f = x -> x + exp(sin(4*x));
+dfdx = x -> 1 + 4*exp(sin(4*x))*cos(4*x);
+d2fdx2 = x ->  4*exp(sin(4*x))*(4*cos(4*x)^2-4*sin(4*x));
+
+t, Dx, Dxx = FNC. diffmat2(18, [-1,1]);
+y = f.(t);
+Dx[1:5, 1:5]
+Dxx[1:5, 1:5]
+```
+
+Poor accuracy for small values of n. 
+
+```{julia}
+yx = Dx*y;
+yxx = Dxx*y;
+plot(dfdx,-1,1,layout=2,xaxis=(L"x"),yaxis=(L"f'(x)"))
+scatter!(t, yx,subplot=1)
+plot!(d2fdx2,-1,1,subplot=2,xaxis=(L"x"),yaxis=(L"f''(x)"))
+scatter!(t, yxx,subplot=2)
+```
+
+```{julia}
+n = @. round(Int,2^(4:.5:11) );
+err1 = zeros(size(n));
+err2 = zeros(size(n));
+for (k,n) in enumerate(n)
+    t,Dx,Dxx = FNC.diffmat2(n,[-1,1])
+    y = f.(t)
+    err1[k] = norm( dfdx.(t) - Dx*y, Inf )
+    err2[k] = norm( d2fdx2.(t) - Dxx*y, Inf )
+end
+plot(n,[err1 err2],m=:o,label=[L"f'" L"f''"]);
+plot!(n,10*10*n.^(-2),l=(:dash,:gray),label="2nd order",
+    xaxis=(:log10,"n"), yaxis=(:log10,"max error"),
+    title="Convergence of finite differences")
+```
+
+## Spectral differentiation {-}
+
+From chapter 9, instead of using local node set, use all of the nodes for global interpolation.  The convergence is spectral if $f$ has infinitely many derivatives on the interval (carries through to the derivatives).
+
+**Chebyshev differentiation matrix** is a dense matrix with entries:
+
+$$
+D_{00} = \frac{2n^2 +1}6, \quad D_{nn} = -\frac{2n^2 +1}6\\
+D_{ij} = \begin{cases}
+            -\frac{x_i}{2(1-x^2_i)}, & i - j,\\
+            \frac{c_i}{c_j}\frac{(-1)^{i+j}}{x_i-x_j}, & i \neq j,
+          \end{cases}
+$$
+
+## Demo 10.3.4 {-}
+
+```{julia}
+t,Dx = FNC.diffcheb(3,[-1,1]);
+Dx
+```
+
+```{julia}
+f = x -> x + exp(sin(4*x));
+dfdx = x -> 1 + 4*exp(sin(4*x))*cos(4*x);
+d2fdx2 = x -> 4*exp(sin(4*x))*(4*cos(4*x)^2-4*sin(4*x));
+
+n = 5:5:70;
+err1 = zeros(size(n));
+err2 = zeros(size(n));
+for (k,n) in enumerate(n)
+    t,Dx,Dxx = FNC.diffcheb(n,[-1,1])
+    y = f.(t)
+    err1[k] = norm( dfdx.(t) - Dx*y, Inf )
+    err2[k] = norm( d2fdx2.(t) - Dxx*y, Inf )
+end
+
+plot(n,[err1 err2],m=:o,label=[L"f'" L"f''"],
+    xaxis=(L"n"), yaxis=(:log10,"max error"),
+    title="Convergence of Chebyshev derivatives")
+```
+
+## Exercise 10.1.5 and 10.2.3 {-}
+
+The stationary *Allen-Cahn equation* is a model of phase changes, such as the change from liquid to solid. In one spatial dimension it can be written as:
+
+$$
+\epsilon u'' = u^3 - u, \quad 0 \leq x \leq 1, \quad u(0) = -1, \quad u(1) = 1.
+$$
+
+As $\epsilon \rightarrow 0$, the solution tends toward a step function transition between -1 and 1. By symmetry, $u'(x) = -u'(1-x).$
+
+(a) Use shoot function with initial solution estimate $(u(0) = -1, u'(0) = 0)$ to solve the equation for $\epsilon = 0.2$. Plot the solution.
+
+```{julia}
+epsilon = 0.2;
+phi = (x, u, du_dx) -> (u^3 - u)/epsilon;
+a = eps();  b = 1;
+
+g1(u, du) = u + 1; # u(0) = -1
+g2(u, du) = u - 1; # u(1) = 1
+
+x,u,du_dx = FNC.shoot(phi, (a, b), g1, g2, [-1, 0]);
+plot(x, u, xaxis = L"x", yaxis = (L"u(x)"), label="epsilon = $epsilon",
+           title = "Shooting for phase change", leg=:topleft)
+
+@show du_dx[1] - du_dx[end];
+```
+(b) repeat with $\epsilon = 0.02$
+
+```{julia}
+epsilon = 0.02; 
+
+x,u, du_dx = FNC.shoot(phi, (a, b), g1, g2, [-1, 0]);
+plot!(x, u, label="epsilon = $epsilon")
+
+@show du_dx[1] - du_dx[end];
+```
+
+(c) repeat with $\epsilon = 0.002$
+
+
+```{julia}
+epsilon = 0.002; 
+
+x, u, du_dx = FNC.shoot(phi, (a, b), g1, g2, [-1, 0]);
+plot!(x, u, label="epsilon = $epsilon")
+
+@show du_dx[1] - du_dx[end];
+```
+
+Try different initializations for $u$. Do any seem to be valid?
+
+```{julia}
+plt = plot(xaxis = L"x", yaxis = L"u(x)",
+           title = "Different initial values", leg=:bottomright);
+
+for w0 in -1.0:0.1:0.0
+    x,u = FNC.shoot(phi, (a, b), g1, g2, [w0, 0]);
+    plot!(x, u, label="u(x) = $w0")
+end
+
+plt
+```
+
+```{julia}
+plt = plot(xaxis = L"x", yaxis = L"u(x)",
+           title = "Different initial values", leg=:topleft);
+
+for w1 in [0.0 0.001 0.0001 eps()]
+    x,u = FNC.shoot(phi, (a, b), g1, g2, [-1.0, w1]);
+    plot!(x, u, label="u'(x) = $w1")
+end
+
+plt
+```
+
+## Exercise 10.2.3 {-}
+
+Continuation of 10.1.5. Now compute $u'(0) - u'(1)$ for the three values of $\epsilon$. 
+
+```{julia}
+for epsilon in [0.2, 0.02, 0.002]
+  x, u, du_dx = FNC.shoot(phi, (a,b), g1, g2, [-1.0, 0.0]);
+  @show du_dx[1] - du_dx[end]
+end
+```
+
+## Exercise 10.3.3 {-}
+
+To get a fourth-order accrate version of $\mathbf{D}_x$, five points per row are needed, including two special rows at each boundary. For a fourth-order $\mathbf{D}_{xx}$, five symmetric points per row are needed for interior rows and six points are needed for the rows near a boundary. 
+
+(a) modify `diffmat2()` to a function `diffmat4`, which outputs fourth-order accurate differentiation matrices. (may use `fdweights()`)
+
+```{julia}
+"""
+    diffmat4(n,xspan)
+
+Compute 4th-order-accurate differentiation matrices on `n`+1 points
+in the interval `xspan`. Returns a vector of nodes and the matrices
+for the first and second derivatives.
+"""
+function diffmat4(n,xspan)
+    a,b = xspan
+    h = (b-a)/n
+    x = [ a + i*h for i in 0:n ]   # nodes
+
+    # Define most of Dx by its diagonals.
+    int_pts = FNC.fdweights(x[1:5].-x[3], 1)
+    Dx = diagm(-2=>fill(int_pts[1],n-1),
+               -1=>fill(int_pts[2],n),
+               0=>fill(int_pts[3],n+1),
+               1=>fill(int_pts[4],n),
+               2=>fill(int_pts[5],n-1))
+    
+    # Boundaries 1, 2, n, n+1
+    for i in 1:2
+      Dx[i,1:5] = FNC.fdweights(x[1:5].-x[i],1)
+      Dx[(n+i-1),((n+1)-4):(n+1)] =
+        FNC.fdweights(x[((n+1)-4):(n+1)].-x[(n+i-1)],1)
+    end
+    
+    # Define most of Dxx by its diagonals.
+    int_pts = FNC.fdweights(x[1:5].-x[3], 2)
+    Dxx = diagm(-2=>fill(int_pts[1],n-1),
+               -1=>fill(int_pts[2],n),
+               0=>fill(int_pts[3],n+1),
+               1=>fill(int_pts[4],n),
+               2=>fill(int_pts[5],n-1))
+
+    # Fix first and last rows.
+    for i in 1:2
+      Dxx[i,1:6] = FNC.fdweights(x[1:6].-x[i],2)
+      Dxx[(n+i-1),((n+1)-5):(n+1)] =
+        FNC.fdweights(x[((n+1)-5):(n+1)].-x[(n+i-1)],2)
+    end
+
+    return x,Dx,Dxx
+end
+```
+
+(b)
+
+```{julia}
+f = x -> x + exp(sin(4*x));
+dfdx = x -> 1 + 4*exp(sin(4*x))*cos(4*x);
+d2fdx2 = x ->  4*exp(sin(4*x))*(4*cos(4*x)^2-4*sin(4*x));
+
+t, Dx, Dxx = diffmat4(18, [-1,1]);
+y = f.(t);
+Dx[1:5, 1:10]
+Dxx[1:5, 1:10]
+```
+
+```{julia}
+yx = Dx*y;
+yxx = Dxx*y;
+plot(dfdx,-1,1,layout=2,xaxis=(L"x"),yaxis=(L"f'(x)"));
+scatter!(t, yx,subplot=1);
+plot!(d2fdx2,-1,1,subplot=2,xaxis=(L"x"),yaxis=(L"f''(x)"));
+scatter!(t, yxx,subplot=2)
+```
+
+```{julia}
+n = @. round(Int,2^(4:.5:11) );
+err1 = zeros(size(n));
+err2 = zeros(size(n));
+for (k,n) in enumerate(n)
+    t,Dx,Dxx = diffmat4(n,[-1,1])
+    y = f.(t)
+    err1[k] = norm( dfdx.(t) - Dx*y, Inf )
+    err2[k] = norm( d2fdx2.(t) - Dxx*y, Inf )
+end
+plot(n,[err1 err2],m=:o,label=[L"f'" L"f''"]);
+plot!(n,10*10*n.^(-4),l=(:dash,:gray),label="4th order",
+    xaxis=(:log10,"n"), yaxis=(:log10,"max error"),
+    title="Convergence of finite differences")
+```
+
+## Exercise 10.1.5 with BVP {-}
+
+state as the original state and the first derivative
+
+```{julia}
+plt = plot(xaxis = L"x", yaxis = L"u(x)",
+           title = "Different epsilons", leg=:bottomright);
+
+domain = (eps(),1.0); # note that 1.0 vs 1 above for BVProblem vs shoot
+
+for epsilon in [0.2, 0.02, 0.002]
+  function ode!(f, u, epsilon, x)
+    f[1] = -u[2]*(1-x) # first derivative
+    f[2] = (u[1]^3 - u[1])/epsilon # second derivative
+  end
+  
+  function bc!(g,u,epsilon,x)
+    g[1] = u(0)[1] + 1.0
+    g[2] = u(1)[1] - 1.0
+  end
+    
+  bvp = BVProblem(ode!, bc!, [-1.0, 0.0], domain, epsilon);
+  u = solve(bvp);
+  plot!(u, idxs = 1, label="eps = $epsilon") # how to access it correctly so only first component is plotted? idxs = 1
+end
+
+plt
+```
+
+## Collocation for linear problems {-}
+
+**Collocation**: the locations of the unknowns and approximations are at the same nodes.  
+
+Univariate linear TVBVP:
+
+$$
+u'' + p(x)u' + q(x)u = r(x), \quad u(a) = \alpha, u(b) = \beta.
+$$
+
+Matrix linear TVBVP with differencing:
+
+$$
+\mathbf{Lu} = \mathbf{r}, \quad \mathbf{L} = \mathbf{D}_{xx} + \mathbf{PD}_{x} + \mathbf{Q}.
+$$
+
+Then, add in boundary problems with the deletion matrix $\mathbf{E}$:
+
+$$
+\left[\begin{array}{c} 
+e_0^T\\
+\mathbf{EL}\\
+e_n^T
+\end{array}\right] 
+\mathbf{u} = 
+\left[\begin{array}{c} 
+\alpha\\
+\mathbf{Er}\\
+\beta
+\end{array}\right]. 
+$$
+
+## Demo 10.4.2 {-}
+
+$$
+u'' - (\cos x)u' + (\sin x)u = 0, \quad u(0) = 1, u\left(\frac{3\pi}{2}\right) = \frac1e.
+$$
+All the coefficients and response need to be functions:
+
+```{julia}
+exact = x -> exp(sin(x));
+p = x -> -cos(x);
+q = sin;
+r = x -> 0; 
+
+x,u = FNC.bvplin(p,q,r,[0,3*pi/2],1,exp(-1),30);
+
+plot(exact,0,3π/2,layout=(2,1),label="exact");
+scatter!(x,u,m=:o,subplot=1,label="numerical",
+    yaxis=("solution"),title="Solution of a linear BVP");
+
+plot!(x,exact.(x)-u,subplot=2,xaxis=L"x",yaxis=("error"))
+```
+
+## Accuracy and Stability for Collocation {-}
+
+$$
+u'' - \lambda^2u = \lambda^2, \quad u(0) = -1, u(1) = 0.
+$$
+```{julia}
+lambda = 10;
+exact = x -> sinh(lambda*x)/sinh(lambda) - 1;
+
+p = x -> 0;
+q = x -> -lambda^2;
+r = x -> lambda^2; 
+```
+
+```{julia}
+n = 5*[round(Int,10^d) for d in 0:.25:3];
+err = zeros(size(n));
+for (k,n) in enumerate(n)
+    x,u = FNC.bvplin(p,q,r,[0,1],-1,0,n)    
+    err[k] = norm(exact.(x)-u,Inf)
+end
+
+data = (n=n[1:4:end],err=err[1:4:end]);
+pretty_table(data,["n","max-norm error"])
+```
+
+```{julia}
+plot(n,err,m=:o,label="observed",
+    xaxis=(:log10,L"n"), yaxis=(:log10,"max-norm error"),
+    title="Convergence for a linear BVP");
+plot!(n,0.25*n.^(-2),l=(:dash,:gray),label="2nd order")
+```
+
+## Exercise 10.4.5 {-}
+
+The *Airy* equation is $u''=xu$. Its solution is exponential for $x>0$ and oscillatory for $x<0$. The exact solution is given by $u = c_1\textrm{Ai}(x) + c_2\textrm{Bi}(x)$, where Ai and Bi are Airy functions (`airyai` and `airybi` in julia).
+
+(a) Suppose that $u(-10) = -1, u(2) = 1$. By setting up and solving a $2 \times 2$ linear system, find the numerical values for $c_1$ and $c_2$. Plot resulting exact solution
+
+```{julia}
+x = [-10; 2];
+b = [-1; 1];
+L = [airyai.(x) airybi.(x)];
+
+c = L \ b;
+exact = x -> c[1]*airyai(x) + c[2]*airybi(x);
+
+plot(exact, -10, 2, title = "2x2 solution")
+```
+
+(b) Use `bvplin` with $n = 120$ to find the solution with the boudnary conditions in (a). In a 2-by-1 subplot array, plot the finite-difference solution and its error. 
+
+```{julia}
+p = x -> 0; # first derivative
+q = x -> -x; # function
+r = x -> 0; # output
+
+x,u = FNC.bvplin(p,q,r,[-10,2], -1, 1, 120);
+
+plot(exact, -10, 2,layout=(2,1),label="exact");
+scatter!(x,u,m=:o,subplot=1,label="numerical",
+    yaxis=("solution"),title="Solution of a linear BVP");
+
+plot!(x,exact.(x)-u,subplot=2,xaxis=L"x",yaxis=("error"))
+```
+
+(c) repeat with $n = 800$
+
+```{julia}
+p = x -> 0; # first derivative
+q = x -> -x; # function
+r = x -> 0; # output
+
+x,u = FNC.bvplin(p,q,r,[-10,2], -1, 1, 800);
+
+plot(exact, -10, 2,layout=(2,1),label="exact");
+scatter!(x,u,m=:o,subplot=1,label="numerical",
+    yaxis=("solution"),title="Solution of a linear BVP");
+
+plot!(x,exact.(x)-u,subplot=2,xaxis=L"x",yaxis=("error"))
+```
+
+## Nonlinearity and boundary conditions {-}
+
+Collocation approach: replace functions by vectors, derivatives by differentiation matrices and use quasi-Newton method for nonlinear system.  
+
+$$
+\mathbf{f(u)} = 
+\left[\begin{array}{c} 
+\mathbf{E}(\mathbf{D}_{xx} \mathbf{u} - \mathbf{r(u)})\\
+g_1(u_0, u_0')\\
+g_2(u_n, u_n')
+\end{array}\right] = \mathbf{0}.
+$$
+
+- **Parameter continuation**: technique to initialize method; solve at one value of the parameter and then use it as initialization for next value (ex: step function with $\epsilon$)
+
+## Exercise 10.5.7 {-}
+
+The following nonlinear BVP was proposed by Carrier:
+
+$$
+\epsilon u'' + 2(1-x^2)u + u^2 = 1, \quad u(-1) = u(1) = 0.
+$$
+
+In order to balance the different components of the residual, it's best to implement the boundary condition numerically as $u/\epsilon = 0$.
+
+(a) Use `bvp` to solve the problem with $\epsilon = 0.003, n=200$, and an initial estimate of all zeros. Plot the result; you should get a solution with 9 local maxima.
+
+(b) Starting with result of (a) continue the parameter sequence of $\epsilon$ using most recent solution as initialization for the next value. Plot end result for $\epsilon = 0.3$.
+
+
+```{julia}
+domain = [-1,1];
+epsilon = 0.003;
+phi = (x,u,du) -> (1 - u^2 - 2*(1-x^2)*u)/epsilon
+g1(u,du) = 0;
+g2(u,du) = 0;
+init = zeros(201);
+x,u1 = FNC.bvp(phi,domain,g1,g2,init);
+
+plot(x,u1,xaxis=(L"x"),yaxis=(L"u(x)"),
+     title="Solution of Carrier problem")
+```
+
+```{julia, eval = FALSE}
+## (b)
+u_ee = init; #trick to access u_ee globally
+
+for ee in -3:0.2:-1
+  epsilon = 3*10^ee
+  x,u_ee = FNC.bvp(phi,domain,g1,g2,u1)
+end
+
+plot(x,u_ee,xaxis=(L"x"),yaxis=(L"u(x)"),
+   title="Solution of Carrier problem with eps = 0.3") 
+```
+
+```{julia, eval = FALSE}
+## (c) now do b in reverse
+init = zeros(201);
+
+for ee in -1.0:-0.2:-3
+  epsilon = 3*10^ee
+  x,u_x = FNC.bvp(phi,domain,g1,g2,init)
+  init = u_x
+end
+
+plot(x,u_x,xaxis=(L"x"),yaxis=(L"u(x)"),
+   title="Solution of Carrier problem with eps = 0.003")
+```
+
+## The Galerkin method {-}
+
+Collocation = differentiation, Galerkin = integration
+
+**Weak Solution**: if $u(x)$ is a function that satisfies the weak form for all valid $\psi(x)$, then $u$ is a weak solution
+
+$$
+\int_a^b \left[c(x)u'(x)\psi'(x) + s(x)u(x)\psi(x)\right]dx = \int_a^b f(x)\psi(x)dx.
+$$
+
+## Galerkin conditions {-}
+
+Define two sets of bases for $\psi(x) = \sum_i z_i \phi_i(x)$ and $u(x) = \sum_j w_j \phi_j(x)$. Then, we have $i = 1,...,m$ constraints:
+
+$$
+\sum_{j=1}^m \left[\int_a^b c(x)\phi_i'(x)\phi_j'(x) dx + \int_a^b s(x)\phi_i(x)\phi_j(x)dx \right] = \int_a^b f(x)\phi_i(x)dx
+$$
+
+Define matrices to represent the system of equations:
+
+$$
+(\mathbf{K} + \mathbf{M})\mathbf{w} = \mathbf{f},
+$$
+where $\mathbf{K}$ is the stiffness and $\mathbf{M}$ is the mass. 
+
+## Finite Elements {-}
+
+- Common choice for the bases are the hat functions from Chapter 5. 
+- Hat functions only nonzero at two adjacent intervals
+- Integration is local
+- Second-order accuracy still maintained if coefficient functions replaced with interval endpoint average
+- spatially localized contributions to the matrices = **finite element method**
+
+**Demo 10.6.4**
+
+```{julia}
+c = x -> x^2;
+q = x -> 4;
+f = x -> sin(pi*x);
+x,u = FNC.fem(c,q,f,0,1,50);
+plot(x,u,label="",
+    xaxis=(L"x"),yaxis=(L"u"),title="Solution by finite elements")
+```
+
+## Exercise 10.6.1 {-}
+
+For each linear BVP, use `fem` to solve and plot the solution for $n=40$. Then for each $n = 10, 20, 40, ... 640$, compute the norm of the error. Make a log-log convergence plot fo error versus $n$ and compare graphically to second-order convergence. 
+
+(a)
+
+$$
+-u'' + u = -8 + 16x^2 - x^4, \quad u(0)=u(2)=0.
+$$
+Exact solution: $x^2(4-x^2)$.
+
+```{julia}
+c = x -> 1; # second derivative negative ?? 1 or x?
+s = x -> 1; # function
+f = x -> -8 + 16*x^2 - x^4; #output
+
+x,u = FNC.fem(c,s,f,0,2,40);
+plot(x,u,label="",
+    xaxis=(L"x"),yaxis=(L"u"),title="Solution by finite elements")
+```
+
+```{julia}
+exact = x -> (x^2)*(4-x^2);
+
+n = [10*(2^(i-1)) for i = 1:7];
+
+err = zeros(size(n));
+
+for (k,n) in enumerate(n)
+  x,u = FNC.fem(c,s,f,0,2,n)
+  err[k] = norm(exact.(x)-u, Inf)
+end
+
+plot(n, err, m=:o);
+plot!(n,10*10*n.^(-2),l=(:dash,:gray),label="2nd order",
+    xaxis=(:log10,"n"), yaxis=(:log10,"max error"),
+    title="Convergence of Finite Element Method")
+```
+
 
 ## Meeting Videos {-}
 
