@@ -293,7 +293,7 @@ end
 
 ## Exercise 10.3.3 {-}
 
-To get a fourth-order accrate version of $\mathbf{D}_x$, five points per row are needed, including two special rows at each boundary. For a fourth-order $\mathbf{D}_{xx}$, five symmetric points per row are needed for interior rows and six points are needed for the rows near a boundary. 
+To get a fourth-order accurate version of $\mathbf{D}_x$, five points per row are needed, including two special rows at each boundary. For a fourth-order $\mathbf{D}_{xx}$, five symmetric points per row are needed for interior rows and six points are needed for the rows near a boundary. 
 
 (a) modify `diffmat2()` to a function `diffmat4`, which outputs fourth-order accurate differentiation matrices. (may use `fdweights()`)
 
