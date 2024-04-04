@@ -1,15 +1,15 @@
-# R4DS Fundamentals of Numerical Computation Book Club
+# DSLC Fundamentals of Numerical Computation Book Club
 
-Welcome to the R4DS Fundamentals of Numerical Computation Book Club!
+Welcome to the DSLC Fundamentals of Numerical Computation Book Club!
 
 We are working together to read [_Fundamentals of Numerical Computation_](https://tobydriscoll.net/fnc-julia/) by Tobin A. Driscoll and Richard J. Braun (copyright 2022).
-If you would like a print version, please consider purchasing it using our [Amazon Affiliates link](https://amzn.to/3Ykfa51). All profits from purchases through that link go toward maintaining the R4DS Online Learning Community.
-Join the [#book_club-fnc](https://rfordatascience.slack.com/archives/C04LLKVNMP1) channel on the [R4DS Slack](https://r4ds.io/join) to participate.
-As we read, we are producing [notes about the book](https://r4ds.io/fnc).
+If you would like a print version, please consider purchasing it using our [Amazon Affiliates link](https://amzn.to/3Ykfa51). All profits from purchases through that link go toward maintaining the Data Science Learning Community.
+Join the [#book_club-fnc](https://dslcio.slack.com/archives/C04LLKVNMP1) channel on the [DSLC Slack](https://dslc.io/join) to participate.
+As we read, we are producing [notes about the book](https://dslc.io/fnc).
 
 ## Meeting Schedule
 
-If you would like to present, please see the sign-up sheet for your cohort (linked below, and pinned in the [#book_club-fnc](https://rfordatascience.slack.com/archives/C04LLKVNMP1) channel on Slack)!
+If you would like to present, please see the sign-up sheet for your cohort (linked below, and pinned in the [#book_club-fnc](https://dslcio.slack.com/archives/C04LLKVNMP1) channel on Slack)!
 
 - [Cohort 1](https://docs.google.com/spreadsheets/d/1FyD-bQCDYbiIwHoXaldTvrqSc6sRpZeckhvC0mBf1Sg/edit?usp=sharing) (started 2023-08-16, facilitated by Toryn Schafer): [Wednesdays, 5:00 PM CST/CDT](https://www.timeanddate.com/worldclock/converter.html?iso=20230816T220000&p1=24&p2=1440) | [meeting videos](https://www.youtube.com/playlist?list=PL3x6DOfs2NGgf2GCeKJ0i1yzdVcWG6wRc)
 
@@ -40,7 +40,7 @@ Do these steps each time you present another chapter:
 10. When your PR has been accepted ("merged"), `usethis::pr_finish()` to close out your branch and prepare your local repository for future work.
 11. Now that your local copy is up-to-date with the main repo, you need to update your remote fork. Run `gert::git_push("origin")` or click the `Push` button on the `Git` tab of Rstudio.
 
-When your PR is checked into the main branch, the bookdown site will rebuild, adding your slides to [this site](https://r4ds.io/fnc).
+When your PR is checked into the main branch, the bookdown site will rebuild, adding your slides to [this site](https://dslc.io/fnc).
 
 
 ## Code of Conduct
